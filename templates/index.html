@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perplexity Chat App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #chat-container {
+            height: 400px;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            padding: 10px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            padding: 8px 12px;
+            border-radius: 15px;
+            margin: 5px 0;
+            max-width: 70%;
+            margin-left: auto;
+            text-align: right;
+        }
+        .assistant-message {
+            background-color: #f0f0f0;
+            padding: 8px 12px;
+            border-radius: 15px;
+            margin: 5px 0;
+            max-width: 70%;
+        }
+        #message-form {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        #model-selector-container {
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        #model-selector {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        #model-details {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+        #model-context {
+            font-weight: bold;
+            color: #4a6fa5;
+        }
+        #model-description {
+            margin-top: 5px;
+            padding: 8px;
+            background-color: #fff;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #555;
+            border: 1px solid #e9ecef;
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #send-button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #send-button:hover {
+            background-color: #45a049;
+        }
+        .loading {
+            text-align: center;
+            color: #888;
+            font-style: italic;
+        }
+        .error-message {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat with Perplexity AI</h1>
+    <div id="chat-container"></div>
+    <form id="message-form">
+        <div id="model-selector-container">
+            <label for="model-selector"><strong>Select AI Model:</strong></label>
+            <select id="model-selector">
+                {% for model in models %}
+                    <option value="{{ model.id }}" 
+                            data-description="{{ model.description }}"
+                            data-context="{{ model.context }}">
+                        {{ model.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            <div id="model-details">
+                <div>Context length: <span id="model-context"></span></div>
+            </div>
+            <div id="model-description"></div>
+        </div>
+        <input type="text" id="message-input" placeholder="Type your message here..." required>
+        <button type="submit" id="send-button">Send</button>
+    </form>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatContainer = document.getElementById('chat-container');
+            const messageForm = document.getElementById('message-form');
+            const messageInput = document.getElementById('message-input');
+            const modelSelector = document.getElementById('model-selector');
+            const modelDescription = document.getElementById('model-description');
+            const modelContext = document.getElementById('model-context');
+            
+            // Display details for the initially selected model
+            updateModelDetails();
+            
+            // Update the details when a different model is selected
+            modelSelector.addEventListener('change', updateModelDetails);
+            
+            function updateModelDetails() {
+                const selectedOption = modelSelector.options[modelSelector.selectedIndex];
+                const description = selectedOption.getAttribute('data-description');
+                const context = selectedOption.getAttribute('data-context');
+                
+                modelDescription.textContent = description;
+                modelContext.textContent = context;
+            }
+
+            messageForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const message = messageInput.value.trim();
+                if (!message) return;
+                
+                const selectedModel = modelSelector.value;
+                
+                // Add user message to chat
+                addMessage('user', message);
+                messageInput.value = '';
+                
+                // Add loading indicator
+                const loadingElement = document.createElement('div');
+                loadingElement.className = 'loading';
+                loadingElement.textContent = 'Thinking...';
+                chatContainer.appendChild(loadingElement);
+                
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            message: message,
+                            model: selectedModel
+                        })
+                    });
+                    
+                    // Remove loading indicator
+                    chatContainer.removeChild(loadingElement);
+                    
+                    const data = await response.json();
+                    
+                    if (!response.ok || data.error) {
+                        throw new Error(data.error || 'API request failed');
+                    }
+                    
+                    addMessage('assistant', data.response);
+                } catch (error) {
+                    // Remove loading indicator if it still exists
+                    if (loadingElement.parentNode) {
+                        chatContainer.removeChild(loadingElement);
+                    }
+                    
+                    console.error('Error:', error);
+                    
+                    // Create an error message element
+                    const errorElement = document.createElement('div');
+                    errorElement.className = 'error-message';
+                    errorElement.textContent = `Error: ${error.message || 'Something went wrong. Please try again.'}`;
+                    chatContainer.appendChild(errorElement);
+                    
+                    // Remove the error message after 5 seconds
+                    setTimeout(() => {
+                        if (errorElement.parentNode) {
+                            chatContainer.removeChild(errorElement);
+                        }
+                    }, 5000);
+                }
+            });
+            
+            function addMessage(role, content) {
+                const messageElement = document.createElement('div');
+                messageElement.className = role === 'user' ? 'user-message' : 'assistant-message';
+                messageElement.textContent = content;
+                chatContainer.appendChild(messageElement);
+                
+                // Scroll to bottom
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
