@@ -11,6 +11,21 @@ document.addEventListener('DOMContentLoaded', function () {
   const maxTokensSlider = document.getElementById('max-tokens-slider');
   const maxTokensValue = document.getElementById('max-tokens-value');
 
+  // Configure marked.js
+  marked.setOptions({
+    renderer: new marked.Renderer(),
+    highlight: function (code, lang) {
+      return code; // You can add syntax highlighting library here if needed
+    },
+    pedantic: false,
+    gfm: true, // GitHub flavored markdown
+    breaks: true, // Convert line breaks to <br>
+    sanitize: false, // Don't sanitize, use DOMPurify instead
+    smartLists: true,
+    smartypants: false,
+    xhtml: false,
+  });
+
   // Display details for the initially selected model
   updateModelDetails();
 
@@ -107,7 +122,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const messageElement = document.createElement('div');
     messageElement.className =
       role === 'user' ? 'user-message' : 'assistant-message';
-    messageElement.textContent = content;
+
+    if (role === 'assistant') {
+      // Use marked.js to render markdown for assistant responses
+      // And sanitize the HTML using DOMPurify
+      const markedContent = marked.parse(content);
+      const sanitizedContent = DOMPurify.sanitize(markedContent);
+      messageElement.innerHTML = sanitizedContent;
+    } else {
+      // For user messages, display as plain text
+      messageElement.textContent = content;
+    }
+
     chatContainer.appendChild(messageElement);
 
     // Scroll to bottom
