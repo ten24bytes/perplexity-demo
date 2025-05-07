@@ -94,9 +94,6 @@ def chat():
         payload["max_tokens"] = max_tokens
 
     try:
-        # Log the key and URL just before the request for debugging
-        logging.info(f"Using API Key for request: '{PERPLEXITY_API_KEY}'")
-        logging.info(f"Requesting URL: '{PERPLEXITY_API_URL}'")
         response = requests.post(PERPLEXITY_API_URL, headers=headers, json=payload)
 
         # Log response details
